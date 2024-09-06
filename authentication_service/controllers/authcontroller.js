@@ -6,39 +6,54 @@ const sendEmailWithOTP = require('../utils/emailservice');
 
 const prisma = new PrismaClient();
 
-const register = async (req, res) => {
-    try {
+const { body, validationResult } = require('express-validator');
+
+const register = [
+    // Validate and sanitize fields
+    body('f_name').isString().notEmpty().withMessage('First name is required'),
+    body('l_name').isString().notEmpty().withMessage('Last name is required'),
+    body('email').isEmail().withMessage('Invalid email address'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
+    body('phone_no').optional().isString(),
+    body('address').optional().isString(),
+
+    async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+
         const { f_name, l_name, email, password, phone_no, address } = req.body;
-       const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Generate a 6-digit OTP
-        const otp = Math.floor(100000 + Math.random() * 900000);
+        try {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            const otp = Math.floor(100000 + Math.random() * 900000);
 
-        const customer = await prisma.Customer.create({
-            data: {
-                first_name: f_name,
-                last_name: l_name,
-                email: email,
-                password: hashedPassword,
-                phone_no: phone_no,
-                address: address,
-                otp: otp, // Store OTP in the database
-                isVerified: false // Set verification status to false initially
-            },
-        });
+            const customer = await prisma.Customer.create({
+                data: {
+                    first_name: f_name,
+                    last_name: l_name,
+                    email: email,
+                    password: hashedPassword,
+                    phone_no: phone_no,
+                    address: address,
+                    otp: otp,
+                    isVerified: false
+                },
+            });
 
-        console.log("Customer registered, sending OTP...");
-        
-        await sendEmailWithOTP(customer.email, "Email Verification OTP", otp);
-        console.log("OTP sent");
+            console.log("Customer registered, sending OTP...");
+            await sendEmailWithOTP(customer.email, "Email Verification OTP", otp);
+            console.log("OTP sent");
 
-        res.status(201).json({ message: 'Customer registered. OTP sent for email verification.', customerId: customer.id })
-        
-    } catch (error) {
-        console.error('Error registering customer:', error);
-        res.status(500).json({ message: 'Error registering customer', error });
+            res.status(201).json({ message: 'Customer registered. OTP sent for email verification.', customerId: customer.id })
+            
+        } catch (error) {
+            console.error('Error registering customer:', error);
+            res.status(500).json({ message: 'Error registering customer', error });
+        }
     }
-};
+];
 
 const verifyEmailWithOTP = async (req, res) => {
     try {

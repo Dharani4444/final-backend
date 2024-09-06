@@ -12,11 +12,3 @@ datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
-model Document {
-  id              Int      @id @default(autoincrement())
-  customerId      Int
-  path            String
-  verificationStatus String @default("pending")
-  uploadedAt      DateTime @default(now())
-}
-
